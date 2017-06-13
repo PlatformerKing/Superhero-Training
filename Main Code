@@ -1,0 +1,650 @@
+/*
+
+    F to fly
+    I for invisible
+    S for shield
+    Click to shoot
+
+    CHECKLISTS:
+    
+    Character Name - Not Done
+    Game Name - Not Done
+    Story - Not Done
+    
+    Logo - Not Done
+    Background - Not Done
+    Character - Not Done
+    Portal - Not Done
+    Bad Guys - Not Done
+*/
+
+var grid = 30;
+
+var collision = function(one, two) {
+    return one.x > two.x - one.width &&
+        one.x < two.x + two.width &&
+        one.y > two.y - one.height &&
+        one.y < two.y + two.height;
+};
+
+var superPowers = [0, 0, 100, 0];
+var powerNames = [
+    "Invisibility",
+    "Flying",
+    "Shield",
+    "Bullets",
+];
+var powers = [
+    {
+        title: "Flying",
+        desc: "Allows you to fly, by pressing the F key.",
+        n: 0,
+    },
+    {
+        title: "Invisibility",
+        desc: "Allows you to be invisible. Activated by the I key.",
+        n: 0,
+    },
+    {
+        title: "Shield",
+        desc: "Puts a force field around you. Nothing can hurt you, but you cannot move. Activate by holding on the S key.",
+        n: 0,
+    },
+    {
+        title: "Bullets",
+        desc: "Fires bullets in the direction your mouse is. Destroys cannons and Baddies. Click to fire.",
+        n: 0,
+    },
+    {
+        title: "?????",
+        desc: "You don't know. You will never find out. You will never get it! *Evil Laugh*",
+        n: 0,
+    },
+];
+var colors = [
+    color(232, 84, 84),
+    color(98, 224, 119),
+    color(62, 176, 224),
+    color(227, 227, 70)
+];
+var keys = [];
+var level = 0;
+var blocks = [];
+var startingPowers = [0, 0, 0, 0];
+var portals = [];
+var baddies = [];
+var powerups = [];
+var bullets = [];
+var aaguns = [];
+var player;
+var game;
+var portalImage;
+for(var x = 0; x < 100; x+=20){
+for(var y = 0; y < 100; y+=10){
+    fill(135, 135, 135);
+    stroke(99, 99, 99);
+    strokeWeight(2);
+    ellipse(x, y, 10*1.2, 10*1.2);
+    ellipse(x+10, y+10/2, 10*1.2, 10*1.2);
+}
+}
+var rockDist = [22, 1, 5, 10, 12, 2, 8];
+var rockImage = get(0, 0, 40, 40);
+keyPressed = function() {
+    keys[keyCode] = true;
+};
+keyReleased = function() {
+    keys[keyCode] = false;
+};
+var transTime = 0;
+var goTrans = false;
+var isSecretCode = false;
+var code = [1, 6, 9, 3, 7, 5, 0];
+var doForTrans;
+var transition = function(to, op) {
+    var ran = false;
+    switch(to.toUpperCase()) {
+        case 'RESET': 
+        case 'NEWLEVEL':
+            doForTrans = function() {
+                blocks = [];
+                baddies = [];
+                powerups = [];
+                portals = [];
+                bullets = [];
+                aaguns = [];
+                if (to.toUpperCase() === 'NEWLEVEL'&&!ran){
+                    level++;
+                    ran = true;
+                }
+                //else{
+                    superPowers = [0, 0, 0, 0];
+                //}
+                game.load();
+            };
+        break;
+        case 'SCENE':
+            doForTrans = function() {
+                //scene = op;
+            };
+            
+    }
+    goTrans = true;
+};
+var Bullet;
+var Player = function(x, y) {
+    this.x = x;
+    this.y = y;
+    this.scrollX = 0;
+    this.scrollY = 0;
+    this.width = grid;
+    this.life = 100;
+    this.height = grid;
+    this.jumping = false;
+    this.gravity = 0.6;
+    this.accel = 0.3;
+    this.limit = 5;
+    this.xVel = 0;
+    this.dir = false;
+    this.yVel = 0;
+    this.jumpHeight = 10;
+    this.invis = false;
+    this.forceField = false;
+    this.fieldRange = 150;
+    this.numShield = 25;
+    this.fire = function() {
+        if (superPowers[3] > 0) {
+        bullets.push(new Bullet(this.x, this.y, atan2(this.x-mouseX, this.y-mouseY), true));
+        superPowers[3]--;
+        }
+    };
+    this.n = [];
+    for(var i = 0; i < this.numShield; i++){
+        this.n.push([random(360), random(2, 10), random(30, 90)]);
+    }
+    this.usePowerUps = function() {
+        {
+        if (keys[73] && round(superPowers[0]) > 0) {
+            this.invis = true;
+            superPowers[0] -=0.05;
+        }else{
+            this.invis = false;
+        }
+    }//Cloak
+        {
+            if (keys[70] && round(superPowers[1]) > 0) {
+                this.yVel -= 0.8;
+                superPowers[1]-=0.05;
+            }
+        }//Flying
+        {
+            if (keys[83] && round(superPowers[2]) > 0) {
+                this.forceField = true;
+                superPowers[2] -= 0.05;
+                
+            }else{
+                this.forceField = false;
+            }
+        }//Shield
+    };
+    this.collision = function(xVel, yVel) {
+        for(var i in blocks) {
+            var b = blocks[i];
+            if(!collision(this, b)) { continue; }
+            if(xVel > 0) {
+                this.xVel = 0;
+                this.x = b.x - this.width;
+                
+            }
+            if(xVel < 0) {
+                this.xVel = 0;
+                this.x = b.x + b.width;
+                
+            }
+            if(yVel > 0) {
+                this.jumping = false;
+                this.yVel = 0;
+                this.y = b.y - this.height;
+            }
+            if(yVel < 0) {
+                this.yVel = 0;
+                this.y = b.y + b.height;
+            }
+        }
+        for(var i in baddies) {
+            var b = baddies[i];
+            if(!collision(this, b) || this.invis) { continue; }
+            if (!this.forceField) {
+            transition('RESET');
+            }
+        }
+        for(var i in powerups) {
+            var b = powerups[i];
+            if(!collision(this, b)) { continue; }
+            superPowers[b.n]+=10;
+            powerups.splice(i, 1);
+        }
+        for(var i in portals) {
+            var p = portals[i];
+            var b = [
+                portals[i],
+                {x:p.x, y:p.y-grid, width:p.width, height:p.height},
+                {x:p.x-grid, y:p.y-grid, width:p.width, height:p.height},
+                {x:p.x-grid, y:p.y, width:p.width, height:p.height},
+            ];
+            if(!collision(this, b[0])&&!collision(this, b[1])&&!collision(this, b[2])&&!collision(this, b[3])) { continue; }
+            transition('NEWLEVEL');
+        }
+    };
+    this.update = function() {
+        if (this.life <= 0) {
+            this.life = 0;
+            transition('RESET');
+        }
+        this.keys();
+        this.usePowerUps();
+        this.jumping = true;
+        this.xVel = constrain(this.xVel, -this.limit, this.limit);//So that it doesen't get too fast.
+        this.x+=this.xVel;
+        this.collision(this.xVel, 0);
+        this.yVel+=this.gravity;
+        this.y+=this.yVel;
+        this.collision(0, this.yVel);
+        if (this.life <= 0) {
+            this.life = 0;
+            transition('RESET');
+        }
+    };
+    this.keys = function() {
+        if (keys[RIGHT]&&!this.forceField){
+            this.xVel+=this.accel;
+            this.dir = false;
+        }
+        if (keys[LEFT]&&!this.forceField){
+            this.xVel-=this.accel;
+            this.dir = true;
+        }
+        if ((!keys[LEFT]&&!keys[RIGHT]) || this.forceField){
+            this.xVel*=0.8;
+        }
+        if (keys[UP]&&!this.jumping && !this.forceField){
+            this.yVel = -this.jumpHeight;
+            this.jumping = true;
+        }
+    };
+    this.display = function() {
+        this.update();
+        pushMatrix();
+        translate(this.x, this.y);
+        scale(grid/60);
+        var q = ((this.invis) ? 100 : 255);
+        fill(255, 165, 0, q);
+        rect(0, 0, 60, 60, 5);
+        noStroke();
+        fill(0, 0, 0, q);
+        ellipse(-15, -10, 10, 19);
+        ellipse(15, -10, 10, 19);
+        
+        popMatrix();
+        if (this.forceField) {
+            fill(0, 155, 255, 10);
+            stroke(0, 155, 155);
+            strokeWeight(2);
+            ellipse(this.x, this.y, this.fieldRange, this.fieldRange);
+            var verts = [];
+            for(var i = 0; i < this.numShield; i++){
+                var r = this.n[i][0]+sin(frameCount*this.n[i][1])*this.n[i][2];
+                verts.push({x:this.x + sin(r)*this.fieldRange/2, y: this.y + cos(r)*this.fieldRange/2});
+            }
+            strokeWeight(0.5);
+            beginShape();
+            for(var i = 0; i < verts.length; i++){
+                vertex(verts[i].x, verts[i].y);
+            }
+            endShape();
+        }
+    };
+};
+var Block = function(x, y){
+    this.x = x;
+    this.y = y;
+    this.width = grid;
+    this.height = grid;
+    this.display = function() {
+        image(rockImage, this.x, this.y, grid, grid);
+    };
+};
+var Baddie = function(x, y, m) {
+    this.sx = x;
+    this.y = y;
+    this.x = this.sx;
+    this.width = grid;
+    this.height = grid;
+    this.display = function(n) {
+        this.x = this.sx+sin(frameCount)*25;
+        fill(255, 0, 0);
+        stroke(222, 0, 0);
+        strokeWeight(3*(grid/30));
+        rect(this.x, this.y, grid, grid);
+        pushMatrix();
+        translate(this.x, this.y);
+        scale(grid/30);
+        stroke(0);
+        strokeWeight(1);
+        line(-8, -10, -3, -8);
+        line(8, -10, 3, -8);
+        noFill();
+        arc(0, 11, 20, 19, 210, 335);
+        popMatrix();
+        for(var i in bullets) {
+            var b = bullets[i];
+            if ((this.x === constrain(this.x, b.x-grid/2, b.x+grid/2) &&this.y === constrain(this.y, b.y-grid/2, b.y+grid/2))&&b.g){
+                baddies.splice(n, 1);
+                bullets.splice(i, 1);
+            }
+        }
+    };
+};
+var NewPower = function(x, y, power) {
+    this.x = x;
+    this.y = y;
+    this.width = grid;
+    this.height = grid;
+    this.n = power;
+    this.colors = [
+        color(232, 84, 84),
+        color(98, 224, 119),
+        color(62, 176, 224),
+        color(227, 227, 70)
+    ];
+    this.display = function() {
+        fill(this.colors[this.n]);
+        noStroke();
+        ellipse(this.x, this.y, grid, grid);
+        fill(0);
+        textSize(7);
+        text(powerNames[this.n], this.x, this.y);
+    };
+};
+var Portal = function(x, y) {
+    this.x = x;
+    this.y = y;
+    this.width = grid;
+    this.height = grid;
+    this.display = function() {
+        fill(0, 155, 255);
+        noStroke();
+        ellipse(this.x-grid/2, this.y-grid/2, grid*2, grid*2);
+        if (portalImage) {
+            image(portalImage, this.x-grid/2, this.y-grid/2, grid*2, grid*2);
+        }
+        stroke(255, 155, 0);
+        noFill();
+        strokeWeight(grid/15);
+        ellipse(this.x-grid/2, this.y-grid/2, grid*2, grid*2);
+    };
+};
+var Bullet = function(x, y, r, g) {
+    this.x = x;
+    this.y = y;
+    this.r = r;
+    this.g = g;
+    this.display = function(n) {
+        noStroke();
+        fill(0);
+        ellipse(this.x, this.y, 4, 4);
+        this.x-=sin(this.r)*5;
+        this.y-=cos(this.r)*5;
+        if (this.x < 0 || this.x > width || this.y > height || this.y < 0){
+            bullets.splice(n, 1);
+        }
+        for(var i in blocks){
+            var b = blocks[i];
+            if ((this.x === constrain(this.x, b.x-grid/2, b.x+grid/2) &&this.y === constrain(this.y, b.y-grid/2, b.y+grid/2)) ||( dist(player.x, player.y, this.x, this.y) < player.fieldRange/2 && player.forceField)){
+                bullets.splice(n, 1);
+            }
+        }
+        if ((this.x === constrain(this.x, player.x-grid/2, player.x+grid/2) &&this.y === constrain(this.y, player.y-grid/2, player.y+grid/2))&&!this.g){
+            player.life-=5;
+            bullets.splice(n, 1);
+        }
+    };
+};
+player = new Player(300, 300);
+var AAGun = function(x, y) {
+    this.x = x;
+    this.y = y;
+    this.rot = 0;
+    this.lastX = player.x;
+    this.lastY = player.y;
+    this.aniX = player.x;
+    this.aniY = player.y;
+    this.offTime = 0;
+    this.display = function(n) {
+        noStroke();
+        this.rot = atan2(this.x-this.aniX, this.y-this.aniY);
+        fill(82, 82, 82);
+        rect(this.x, this.y, grid/1.5, grid);
+        pushMatrix();
+        translate(this.x, this.y);
+        rotate(360-this.rot + this.offTime);
+        (rect)(0, 0, grid, grid, 0, 0, Infinity, Infinity);
+        popMatrix();
+        if (!player.invis) {
+            this.lastX = player.x;
+            this.lastY = player.y;
+            this.aniX = player.x;
+            this.aniY = player.y;
+            this.offTime = 0;
+        }else{
+            this.aniX = this.lastX;
+            this.aniY = this.lastY;
+            this.offTime++;
+        }
+        if (frameCount % 32 > 30) {
+            bullets.push(new Bullet(this.x, this.y, this.rot- this.offTime, false));
+        }
+        for(var i in bullets) {
+            var b = bullets[i];
+            if ((this.x === constrain(this.x, b.x-grid/2, b.x+grid/2) &&this.y === constrain(this.y, b.y-grid/2, b.y+grid/2))&&b.g){
+                aaguns.splice(n, 1);
+            }
+        }
+    };
+};
+var portalImage = null;
+var displayAll = function(lvl, d) {
+    if (d) {
+        game.load(lvl);
+    }
+    for(var i in blocks) {
+        blocks[i].display();
+    }
+    for(var i in baddies) {
+        baddies[i].display(i);
+    }
+    for(var i in powerups) {
+        powerups[i].display();
+    }
+    for(var i in portals) {
+        portals[i].display();
+    }
+    for(var i in bullets) {
+        bullets[i].display(i);
+    }
+    for(var i in aaguns) {
+        aaguns[i].display(i);
+    }
+};
+var Game = function() {
+    //I, F, S, B
+    this.levels = [
+        [
+        "####################",
+        "#    %     %     % #",
+        "#                  #",
+        "#                  #",
+        "#                  #",
+        "#                  #",
+        "#                  #",
+        "#    B    B     B @#",
+        "#   ################",
+        "#     &&&          #",
+        "#     &&&          #",
+        "#     &&&    I     #",
+        "################   #",
+        "#       F   S      #",
+        "#  !              ##",
+        "#             I  ###",
+        "####################"
+        ],
+        [
+        "####################",
+        "#                  #",
+        "#                  #",
+        "#                  #",
+        "#                  #",
+        "#                  #",
+        "#                  #",
+        "#          @       #",
+        "#   ################",
+        "#                  #",
+        "#                  #",
+        "#    &       I     #",
+        "################   #",
+        "#           S     B#",
+        "#  !              ##",
+        "#       F        ###",
+        "####################"
+        ],
+    ];
+    this.load = function(lvl) {
+        this.lvl = (lvl) ? lvl : level;
+        startingPowers = superPowers;
+        for(var y = 0; y < this.levels[this.lvl].length; y++){
+        for(var x = 0; x < this.levels[this.lvl][y].length; x++){
+            switch(this.levels[this.lvl][y][x]){
+                case "#":blocks.push(new Block(x*grid + grid/2, (y*grid) + (grid/2)));
+                break;
+                case "!": player = new Player(x*grid + grid/2, y*grid + grid/2);
+                break;
+                case "&": baddies.push(new Baddie(x*grid+grid/2, y*grid+grid/2));
+                break;
+                case "I":
+                case "F":
+                case "S":
+                case "B":
+                    var a = this.levels[this.lvl][y][x];
+                    var n = (a === "I") ? 0 : ((a === "F") ? 1 : ((a === "S")? 2 : 3));
+                    powerups.push(new NewPower(x*grid+grid/2, y*grid+grid/2, n));
+                break;
+                case "@":
+                    portals.push(new Portal(x*grid+grid/2, y*grid+grid/2));
+                    break;
+                case "%": aaguns.push(new AAGun(x*grid+grid/2, y*grid+grid/2));
+            }
+        }
+        }
+        rectMode(CENTER);
+        background(0, 155, 255);
+        displayAll();
+        portalImage = get(0, 0, width, height);
+        background(255, 255, 255);
+        image(portalImage, 0, 0, 200, 200);
+        var img2 = get(0, 0, 200, 200);
+        background(0);
+        fill(255);
+        ellipse(100, 100, 200, 200);
+        img2.mask(get(0, 0, 200, 200));
+        portalImage = img2;
+        background(255);
+    textSize(121);
+    fill(0);
+    text('LOADING', width/2, height/2.6);
+    
+    for(var i = 1; i < (width-46)/75; i++){
+        fill(colors[(i+round(frameCount/20))%colors.length]);
+        noStroke();
+        rect((i*75), 295, 30, 30);
+    }
+    };
+};
+var game = new Game();
+game.load();
+var codeIsTrue = false;
+
+var bottomBar = function() {
+    fill(255, 217, 122);
+    stroke(217, 176, 80);
+    strokeWeight(3);
+    rect(width/2, 550, width*2, 100);
+    
+    //Platmo.
+    for(var i = 0; i < powerNames.length; i++){
+        textSize(19);
+        fill(0);
+        textAlign(RIGHT, CENTER);
+        text(powerNames[i]+":", 113, 516+i*24);
+        textAlign(CENTER , CENTER);
+        
+        rectMode(LEFT);
+        noFill();
+        stroke(0);
+        strokeWeight(1);
+        rect(118, 506+i*24, 50*3, 20.5);
+        fill(colors[i]);
+        noStroke();
+        rect(119, 507+i*24, floor(superPowers[i]*3), 20.4);
+        textSize(18);
+        fill(0);
+        text((superPowers[i] < 50) ? floor(superPowers[i]) : "MAX", 195, 516+i*24);
+    }
+    fill(0);
+    textSize(19);
+    text("Life:", 300, 516);
+    rectMode(LEFT);
+    noFill();
+    stroke(0);
+    strokeWeight(1);
+    rect(326, 506, 150, 20.5);
+    fill(255, 0, 255);
+    noStroke();
+    rect(326, 507, floor(player.life*1.5), 20.4);
+    textSize(18);
+    fill(0);
+    text((player.life < 50) ? floor(player.life) : "MAX", 403, 516);
+};
+
+
+
+draw = function() {
+    textAlign(CENTER , CENTER);
+    textFont(createFont("Trebuchet MS Bold"));
+    rectMode(CENTER);
+    for(var i = 0; i < superPowers.length; i++){
+        superPowers[i] = constrain(superPowers[i], 0, 50);
+    }
+    imageMode(CENTER);
+    background(255, 255, 255);
+    
+    player.display();
+    displayAll(level);
+    fill(255, 255, 255, abs(sin(transTime)*255));
+    noStroke();
+    rect(width/2, height/2, width, height);
+    if (goTrans) {
+        transTime += 2;
+        if (transTime > 180) {
+            goTrans = false;
+            transTime = 0;
+        }
+        if (transTime >= 90) {
+            doForTrans();
+        }
+    }
+    bottomBar();
+    
+};
+mousePressed = function() {
+    player.fire();
+};
